@@ -1,7 +1,9 @@
 name: poc-exploit
 
-# Middlewares du POC. Les applications Spring Boot tournent sur l'hôte (IDE / mvn)
-# et sont scrapées par Prometheus via host.docker.internal.
+# Middlewares du POC. Les applications tournent au choix :
+#   — sur l'hôte (IDE, scripts/run-apps.sh) : docker compose -f infra/docker-compose.yml up -d
+#   — en conteneurs (image du Dockerfile racine) : docker compose -f infra/docker-compose.yml --profile apps up -d --build
+# Dans les deux cas Prometheus les scrape via host.docker.internal (ports publiés sur l'hôte).
 
 services:
 
@@ -115,6 +117,7 @@ services:
       - --web.enable-lifecycle
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
     ports:
       - "9090:9090"
     extra_hosts:
@@ -135,3 +138,50 @@ services:
     depends_on:
       - prometheus
       - jaeger
+
+  # --- Applications (profil "apps") : configuration 100 % par variables d'environnement ---------------------------
+
+  order-service:
+    profiles: [apps]
+    build: { context: .., args: { MODULE: order-service } }
+    image: poc/order-service
+    container_name: poc-order-service
+    ports: ["8081:8081"]
+    environment: &app-env
+      DB_URL: jdbc:postgresql://postgres:5432/orders_write
+      DB_USERNAME: poc
+      DB_PASSWORD: poc
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      DEPLOYMENT_ENVIRONMENT: docker
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+
+  order-projector:
+    profiles: [apps]
+    build: { context: .., args: { MODULE: order-projector } }
+    image: poc/order-projector
+    container_name: poc-order-projector
+    ports: ["8082:8082"]
+    environment:
+      <<: *app-env
+      DB_URL: jdbc:postgresql://postgres:5432/orders_read
+    depends_on:
+      postgres: { condition: service_healthy }
+      kafka-init: { condition: service_completed_successfully }
+
+  gateway:
+    profiles: [apps]
+    build: { context: .., args: { MODULE: gateway } }
+    image: poc/gateway
+    container_name: poc-gateway
+    ports: ["8080:8080"]
+    environment:
+      ORDER_SERVICE_URL: http://order-service:8081
+      ORDER_PROJECTOR_URL: http://order-projector:8082
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+      DEPLOYMENT_ENVIRONMENT: docker
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+    depends_on: [order-service, order-projector]

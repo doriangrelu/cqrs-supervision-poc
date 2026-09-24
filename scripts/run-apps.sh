@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lance les 3 applis en arrière-plan (logs dans ./logs). Arguments supplémentaires passés au projecteur,
-# ex : scripts/run-apps.sh --spring.kafka.listener.concurrency=6 --projector.sleep.max=200ms
+# ex : scripts/run-apps.sh --spring.kafka.listener.concurrency=1
 set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p logs
@@ -11,7 +11,8 @@ start() {
     echo "$module démarré (pid $!, logs/$module.log)"
 }
 
-start order-service
+# local : endpoint de charge _bulk actif, historique de l'outbox conservé (lien base → trace)
+start order-service --order.load-test.enabled=true --namastack.outbox.processing.delete-completed-records=false
 start order-projector "$@"
 start gateway
 

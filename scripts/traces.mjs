@@ -1,5 +1,5 @@
 // Affiche les dernières traces Jaeger d'un service sous forme d'arbre chronologique.
-// Usage : node scripts/traces.mjs [service=gateway] [nbTraces=3] [minutes=10]   (ATTRS=1 pour afficher les attributs)
+// Usage : node scripts/traces.mjs [service=gateway] [nbTraces=3] [minutes=10]   (ATTRS=1 pour afficher les attributs, OP=<opération> pour filtrer, ex : OP="http post /orders")
 const [service = 'gateway', limit = '3', minutes = '10'] = process.argv.slice(2);
 const end = new Date();
 const start = new Date(end.getTime() - Number(minutes) * 60_000);
@@ -8,6 +8,7 @@ url.searchParams.set('query.service_name', service);
 url.searchParams.set('query.start_time_min', start.toISOString());
 url.searchParams.set('query.start_time_max', end.toISOString());
 url.searchParams.set('query.search_depth', limit);
+if (process.env.OP) url.searchParams.set('query.operation_name', process.env.OP);
 
 const res = await fetch(url);
 if (!res.ok) {

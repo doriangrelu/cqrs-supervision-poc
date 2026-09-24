@@ -1,0 +1,8 @@
+**/target/
+logs/
+infra/
+scripts/
+docs/
+.idea/
+.git/
+*.md

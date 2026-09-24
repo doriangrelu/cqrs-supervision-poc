@@ -1,182 +1,964 @@
 {
   "uid": "coherence-cqrs",
   "title": "Cohérence CQRS - outbox → Kafka → projection",
-  "tags": ["poc", "cqrs", "kafka", "outbox"],
+  "tags": [
+    "poc",
+    "cqrs",
+    "kafka",
+    "outbox"
+  ],
   "timezone": "browser",
   "refresh": "5s",
-  "time": { "from": "now-15m", "to": "now" },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
   "schemaVersion": 41,
   "editable": true,
   "graphTooltip": 1,
-  "templating": { "list": [] },
-  "annotations": { "list": [] },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
   "panels": [
     {
-      "type": "row", "title": "SLI de cohérence", "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+      "type": "row",
+      "title": "SLI de cohérence",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
     },
     {
-      "type": "stat", "title": "Lag de cohérence p95 (1m)",
+      "type": "stat",
+      "title": "Lag de cohérence p95 (1m)",
       "description": "Commit de la projection - occurredAt (décision métier). C'est le temps pendant lequel une lecture peut être périmée.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 },
-      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(projection_lag_seconds_bucket[1m])))" }],
-      "fieldConfig": { "defaults": { "unit": "s", "decimals": 2, "color": { "mode": "thresholds" },
-        "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 2 }, { "color": "red", "value": 10 } ] } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(projection_lag_seconds_bucket[1m])))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 2
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "area"
+      }
     },
     {
-      "type": "stat", "title": "Retard Kafka (messages)",
+      "type": "stat",
+      "title": "Retard Kafka (messages)",
       "description": "Somme du lag des offsets du groupe order-projector (kafka-exporter, indépendant de la santé du consommateur).",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 },
-      "targets": [{ "refId": "A", "expr": "sum(kafka_consumergroup_lag{consumergroup=\"order-projector\",topic=\"orders.events\"})" }],
-      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" },
-        "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 50 }, { "color": "red", "value": 1000 } ] } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 4,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(kafka_consumergroup_lag{consumergroup=\"order-projector\",topic=\"orders.events\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "area"
+      }
     },
     {
-      "type": "stat", "title": "Backlog outbox",
+      "type": "stat",
+      "title": "Backlog outbox",
       "description": "Enregistrements outbox pas encore publiés sur Kafka (lag en amont de Kafka, invisible côté consommateur).",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 },
-      "targets": [{ "refId": "A", "expr": "sum(outbox_records{outbox_record_status=\"new\"})" }],
-      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" },
-        "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 100 }, { "color": "red", "value": 1000 } ] } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "area" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 4,
+        "x": 8,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(outbox_records{outbox_record_status=\"new\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "area"
+      }
     },
     {
-      "type": "stat", "title": "Outbox en échec",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 5, "w": 3, "x": 12, "y": 1 },
-      "targets": [{ "refId": "A", "expr": "sum(outbox_records{outbox_record_status=\"failed\"})" }],
-      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "thresholds" },
-        "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+      "type": "stat",
+      "title": "Outbox en échec",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 3,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(outbox_records{outbox_record_status=\"failed\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      }
     },
     {
-      "type": "stat", "title": "DLT (15 min)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 5, "w": 3, "x": 15, "y": 1 },
-      "targets": [{ "refId": "A", "expr": "sum(increase(projection_dlt_total[15m])) or vector(0)" }],
-      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "thresholds" },
-        "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" }
+      "type": "stat",
+      "title": "DLT (15 min)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 3,
+        "x": 15,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(projection_dlt_total[15m])) or vector(0)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background",
+        "graphMode": "none"
+      }
     },
     {
-      "type": "stat", "title": "Doublons ignorés (15 min)",
+      "type": "stat",
+      "title": "Doublons ignorés (15 min)",
       "description": "Événements rejoués ou obsolètes écartés par le contrôle de version (at-least-once).",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 5, "w": 3, "x": 18, "y": 1 },
-      "targets": [{ "refId": "A", "expr": "sum(increase(projection_events_total{outcome=\"skipped\"}[15m])) or vector(0)" }],
-      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" }
-    },
-    {
-      "type": "stat", "title": "Projetés / s",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 5, "w": 3, "x": 21, "y": 1 },
-      "targets": [{ "refId": "A", "expr": "sum(rate(projection_events_total{outcome=\"applied\"}[1m]))" }],
-      "fieldConfig": { "defaults": { "unit": "ops", "decimals": 1, "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" }
-    },
-    {
-      "type": "timeseries", "title": "Lag de cohérence de bout en bout (cliquer un exemplar → trace Jaeger)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 6 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 3,
+        "x": 18,
+        "y": 1
+      },
       "targets": [
-        { "refId": "A", "legendFormat": "p50", "exemplar": true, "expr": "histogram_quantile(0.50, sum by (le) (rate(projection_lag_seconds_bucket[1m])))" },
-        { "refId": "B", "legendFormat": "p95", "exemplar": true, "expr": "histogram_quantile(0.95, sum by (le) (rate(projection_lag_seconds_bucket[1m])))" },
-        { "refId": "C", "legendFormat": "p99", "exemplar": true, "expr": "histogram_quantile(0.99, sum by (le) (rate(projection_lag_seconds_bucket[1m])))" },
-        { "refId": "D", "legendFormat": "max", "expr": "max(projection_lag_seconds_max)" }
+        {
+          "refId": "A",
+          "expr": "sum(increase(projection_events_total{outcome=\"skipped\"}[15m])) or vector(0)"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
     },
     {
-      "type": "timeseries", "title": "Décomposition du lag (moyenne) : outbox → Kafka → traitement",
+      "type": "stat",
+      "title": "Projetés / s",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 3,
+        "x": 21,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(projection_events_total{outcome=\"applied\"}[1m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "area"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Lag de cohérence de bout en bout (cliquer un exemplar → trace Jaeger)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "p50",
+          "exemplar": true,
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(projection_lag_seconds_bucket[1m])))"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "p95",
+          "exemplar": true,
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(projection_lag_seconds_bucket[1m])))"
+        },
+        {
+          "refId": "C",
+          "legendFormat": "p99",
+          "exemplar": true,
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(projection_lag_seconds_bucket[1m])))"
+        },
+        {
+          "refId": "D",
+          "legendFormat": "max",
+          "expr": "max(projection_lag_seconds_max)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Décomposition du lag (moyenne) : outbox → Kafka → traitement",
       "description": "1. outbox = envoi Kafka - occurredAt ; 2. Kafka = réception - envoi ; 3. traitement = durée du listener (sleep simulé + upsert).",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 6 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
       "targets": [
-        { "refId": "A", "legendFormat": "1. attente outbox", "expr": "sum(rate(projection_outbox_wait_seconds_sum[1m])) / sum(rate(projection_outbox_wait_seconds_count[1m]))" },
-        { "refId": "B", "legendFormat": "2. attente Kafka", "expr": "sum(rate(projection_kafka_wait_seconds_sum[1m])) / sum(rate(projection_kafka_wait_seconds_count[1m]))" },
-        { "refId": "C", "legendFormat": "3. traitement", "expr": "sum(rate(spring_kafka_listener_seconds_sum{error=\"none\"}[1m])) / sum(rate(spring_kafka_listener_seconds_count{error=\"none\"}[1m]))" }
+        {
+          "refId": "A",
+          "legendFormat": "1. attente outbox",
+          "expr": "sum(rate(projection_outbox_wait_seconds_sum[1m])) / sum(rate(projection_outbox_wait_seconds_count[1m]))"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "2. attente Kafka",
+          "expr": "sum(rate(projection_kafka_wait_seconds_sum[1m])) / sum(rate(projection_kafka_wait_seconds_count[1m]))"
+        },
+        {
+          "refId": "C",
+          "legendFormat": "3. traitement",
+          "expr": "sum(rate(spring_kafka_listener_seconds_sum{error=\"none\"}[1m])) / sum(rate(spring_kafka_listener_seconds_count{error=\"none\"}[1m]))"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 60, "stacking": { "mode": "normal" }, "showPoints": "never", "lineWidth": 1 } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["lastNotNull", "max"] }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 60,
+            "stacking": {
+              "mode": "normal"
+            },
+            "showPoints": "never",
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
-      "type": "row", "title": "Backlogs", "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
+      "type": "row",
+      "title": "Backlogs",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 15
+      }
     },
     {
-      "type": "timeseries", "title": "Lag consommateur par partition (messages)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
-      "targets": [{ "refId": "A", "legendFormat": "partition {{partition}}", "expr": "sum by (partition) (kafka_consumergroup_lag{consumergroup=\"order-projector\",topic=\"orders.events\"})" }],
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 30, "stacking": { "mode": "normal" }, "showPoints": "never" } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
-    },
-    {
-      "type": "timeseries", "title": "Outbox : enregistrements non publiés / en échec",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "type": "timeseries",
+      "title": "Lag consommateur par partition (messages)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
       "targets": [
-        { "refId": "A", "legendFormat": "new (à publier)", "expr": "sum(outbox_records{outbox_record_status=\"new\"})" },
-        { "refId": "B", "legendFormat": "failed", "expr": "sum(outbox_records{outbox_record_status=\"failed\"})" }
+        {
+          "refId": "A",
+          "legendFormat": "partition {{partition}}",
+          "expr": "sum by (partition) (kafka_consumergroup_lag{consumergroup=\"order-projector\",topic=\"orders.events\"})"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "custom": { "fillOpacity": 20, "showPoints": "never" } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 30,
+            "stacking": {
+              "mode": "normal"
+            },
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
-      "type": "row", "title": "Débits et erreurs", "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 }
+      "type": "timeseries",
+      "title": "Outbox : enregistrements non publiés / en échec",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "new (à publier)",
+          "expr": "sum(outbox_records{outbox_record_status=\"new\"})"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "failed",
+          "expr": "sum(outbox_records{outbox_record_status=\"failed\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 20,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
-      "type": "timeseries", "title": "Débit : écrit (outbox) vs publié (Kafka) vs projeté",
+      "type": "row",
+      "title": "Débits et erreurs",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Débit : écrit (outbox) vs publié (Kafka) vs projeté",
       "description": "Si 'écrit' > 'publié' l'outbox accumule ; si 'publié' > 'projeté' Kafka accumule.",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 25
+      },
       "targets": [
-        { "refId": "A", "legendFormat": "écrits (outbox schedule)", "expr": "sum(rate(outbox_record_schedule_seconds_count[1m]))" },
-        { "refId": "B", "legendFormat": "publiés (outbox process)", "expr": "sum(rate(outbox_record_process_seconds_count{error=\"none\"}[1m]))" },
-        { "refId": "C", "legendFormat": "projetés", "expr": "sum(rate(projection_events_total{outcome=~\"applied|skipped\"}[1m]))" }
+        {
+          "refId": "A",
+          "legendFormat": "écrits (outbox schedule)",
+          "expr": "sum(rate(outbox_record_schedule_seconds_count[1m]))"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "publiés (outbox process)",
+          "expr": "sum(rate(outbox_record_process_seconds_count{error=\"none\"}[1m]))"
+        },
+        {
+          "refId": "C",
+          "legendFormat": "projetés",
+          "expr": "sum(rate(projection_events_total{outcome=~\"applied|skipped\"}[1m]))"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 0, "showPoints": "never", "lineWidth": 2 } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "lineWidth": 2
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
-      "type": "timeseries", "title": "Erreurs projecteur",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "type": "timeseries",
+      "title": "Erreurs projecteur",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 25
+      },
       "targets": [
-        { "refId": "A", "legendFormat": "tentatives en échec", "expr": "sum(rate(projection_events_total{outcome=\"failed\"}[1m])) or vector(0)" },
-        { "refId": "B", "legendFormat": "envoyés en DLT", "expr": "sum(rate(projection_dlt_total[1m])) or vector(0)" },
-        { "refId": "C", "legendFormat": "doublons ignorés", "expr": "sum(rate(projection_events_total{outcome=\"skipped\"}[1m])) or vector(0)" }
+        {
+          "refId": "A",
+          "legendFormat": "tentatives en échec",
+          "expr": "sum(rate(projection_events_total{outcome=\"failed\"}[1m])) or vector(0)"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "envoyés en DLT",
+          "expr": "sum(rate(projection_dlt_total[1m])) or vector(0)"
+        },
+        {
+          "refId": "C",
+          "legendFormat": "doublons ignorés",
+          "expr": "sum(rate(projection_events_total{outcome=\"skipped\"}[1m])) or vector(0)"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "ops", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
-      "type": "row", "title": "Entrée HTTP (gateway) et RED dérivées des traces", "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 }
+      "type": "row",
+      "title": "Entrée HTTP (gateway) et RED dérivées des traces",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      }
     },
     {
-      "type": "timeseries", "title": "Gateway : requêtes / s par route",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
-      "targets": [{ "refId": "A", "legendFormat": "{{method}} {{uri}} {{status}}", "expr": "sum by (method, uri, status) (rate(http_server_requests_seconds_count{job=\"spring-apps\",application=\"gateway\",uri!~\"/actuator.*\"}[1m]))" }],
-      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "fillOpacity": 10, "showPoints": "never" } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+      "type": "timeseries",
+      "title": "Gateway : requêtes / s par route",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{method}} {{uri}} {{status}}",
+          "expr": "sum by (method, uri, status) (rate(http_server_requests_seconds_count{job=\"spring-apps\",application=\"gateway\",uri!~\"/actuator.*\"}[1m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     },
     {
-      "type": "timeseries", "title": "Durée p95 des spans par service / opération (spanmetrics)",
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
-      "targets": [{ "refId": "A", "legendFormat": "{{service_name}} - {{span_name}}", "exemplar": true, "expr": "histogram_quantile(0.95, sum by (le, service_name, span_name) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind!=\"SPAN_KIND_INTERNAL\"}[1m]))) / 1000" }],
-      "fieldConfig": { "defaults": { "unit": "s", "custom": { "fillOpacity": 0, "showPoints": "never" } }, "overrides": [] },
-      "options": { "legend": { "displayMode": "list", "placement": "right" }, "tooltip": { "mode": "multi" } }
+      "type": "timeseries",
+      "title": "Durée p95 des spans par service / opération (spanmetrics)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{service_name}} - {{span_name}}",
+          "exemplar": true,
+          "expr": "histogram_quantile(0.95, sum by (le, service_name, span_name) (rate(traces_span_metrics_duration_milliseconds_bucket{span_kind!=\"SPAN_KIND_INTERNAL\"}[1m]))) / 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 0,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Code applicatif (spans automatiques par couche, starter d'observabilité)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Durée moyenne par méthode (use cases et adapters sortants)",
+      "description": "Timer app.code produit par le starter pour chaque méthode publique des couches application et adapter.out.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 16,
+        "x": 0,
+        "y": 43
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{application}} {{code_layer}} {{code_function}}",
+          "expr": "sum by (application, code_layer, code_namespace, code_function) (rate(app_code_seconds_sum[1m])) / sum by (application, code_layer, code_namespace, code_function) (rate(app_code_seconds_count[1m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 0,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "type": "bargauge",
+      "title": "Appels / s par couche",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 8,
+        "x": 16,
+        "y": 43
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{application}} {{code_layer}}",
+          "instant": true,
+          "expr": "sum by (application, code_layer) (rate(app_code_seconds_count[1m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "row",
+      "title": "Alertes (règles Prometheus : infra/prometheus/alerts.yml)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      }
+    },
+    {
+      "type": "table",
+      "title": "Alertes en cours",
+      "description": "Voir docs/observability.md#runbook pour la conduite à tenir.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "format": "table",
+          "expr": "ALERTS{alertstate=~\"firing|pending\"}"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "__name__": true,
+              "job": true
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true
+      }
     }
   ]
 }

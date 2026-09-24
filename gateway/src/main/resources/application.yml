@@ -1,11 +1,15 @@
+# Point d'entrée unique : routage vers le côté écriture (commandes) et le côté lecture (projections).
+# Valeurs d'environnement : variables avec défaut local. Observabilité / actuator / arrêt propre : observability-starter.
+
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 spring:
   application:
     name: gateway
   cloud:
-    # Spring Cloud 2025.1 cible Boot 4.0 ; on tourne sur Boot 4.1 (imposé par Namastack 1.9)
+    # Spring Cloud 2025.1 cible Boot 4.0 ; on tourne sur Boot 4.1 (imposé par Namastack 1.9).
+    # À réactiver dès la sortie du train Spring Cloud aligné sur Boot 4.1.
     compatibility-verifier:
       enabled: false
     gateway:
@@ -14,33 +18,16 @@ spring:
           routes:
             # Côté lecture (CQRS query) : projections
             - id: order-projector
-              uri: http://localhost:8082
+              uri: ${ORDER_PROJECTOR_URL:http://localhost:8082}
               predicates:
                 - Path=/orders-view/**
             # Côté écriture (CQRS command) : service propriétaire de la donnée
             - id: order-service
-              uri: http://localhost:8081
+              uri: ${ORDER_SERVICE_URL:http://localhost:8081}
               predicates:
                 - Path=/orders/**,/orders
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus,metrics,gateway
-  tracing:
-    sampling:
-      probability: 1.0
-  opentelemetry:
-    tracing:
-      export:
-        otlp:
-          endpoint: http://localhost:4318/v1/traces
-  otlp:
-    metrics:
-      export:
-        enabled: false   # métriques en scrape Prometheus (exemplars)
-  metrics:
-    distribution:
-      percentiles-histogram:
-        http.server.requests: true
+  # Client HTTP utilisé pour appeler les services en aval : un service lent ne doit pas bloquer les threads
+  http:
+    clients:
+      connect-timeout: ${GATEWAY_CONNECT_TIMEOUT:2s}
+      read-timeout: ${GATEWAY_READ_TIMEOUT:10s}

@@ -1,3 +1,13 @@
+# Configuration propre à order-service.
+#
+# Les réglages communs à tous les services (traces, export OTLP, actuator, probes, arrêt propre, ProblemDetail,
+# spans SQL...) sont fournis par observability-starter (META-INF/poc/observability-defaults.properties) :
+# ne pas les répéter ici.
+#
+# Convention 12-factor : toute valeur qui dépend de l'environnement est lue dans une variable d'environnement,
+# avec une valeur par défaut adaptée au poste de dev (docker compose de infra/). Toute autre propriété reste
+# surchargeable par le binding relâché de Spring Boot (ex : SERVER_PORT, NAMASTACK_OUTBOX_RETRY_MAXRETRIES).
+
 server:
   port: 8081
 
@@ -6,89 +16,121 @@ spring:
     name: order-service
   threads:
     virtual:
-      # Namastack bascule alors sur un exécuteur à threads virtuels (limité par executor-concurrency-limit)
+      # Requêtes HTTP sur threads virtuels ; Namastack bascule aussi sur un exécuteur à threads virtuels
+      # (borné par namastack.outbox.processing.executor-concurrency-limit)
       enabled: true
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/orders_write
-    username: poc
-    password: poc
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/orders_write}
+    username: ${DB_USERNAME:poc}
+    password: ${DB_PASSWORD:poc}
     hikari:
-      maximum-pool-size: 40
+      # Pool fixe (minimum-idle = maximum-pool-size par défaut). Avec les threads virtuels, c'est le pool qui borne
+      # la concurrence en base : à dimensionner avec le nombre d'instances (max_connections Postgres).
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      # Attente maximale d'une connexion libre (ms) : échec rapide plutôt qu'un empilement de requêtes
+      connection-timeout: 5000
+      # Durée de vie maximale d'une connexion (ms), inférieure aux coupures réseau / proxy côté base
+      max-lifetime: 1800000
+
+  flyway:
+    # Flyway gère tout le schéma (tables métier et outbox). En production, le compte applicatif n'a pas les droits
+    # DDL : les migrations passent par un compte propriétaire du schéma, si fourni.
+    user: ${DB_MIGRATION_USERNAME:${spring.datasource.username}}
+    password: ${DB_MIGRATION_PASSWORD:${spring.datasource.password}}
+
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
+      # Accusé de réception de toutes les répliques in-sync : un message acquitté survit à la perte du leader
       acks: all
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      # Sérialiseur Jackson 3 de Spring Kafka 4 (Instant en ISO-8601 par défaut avec Jackson 3)
+      # Sérialiseur Jackson 3 de Spring Kafka 4 (Instant en ISO-8601)
       value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
       properties:
+        # Pas de doublon ni de réordonnancement sur retry réseau du producteur
         enable.idempotence: true
-        # Envoi synchrone par enregistrement côté Namastack : pas d'attente de batching
+        # Namastack envoie enregistrement par enregistrement et attend l'acquittement : pas d'attente de batching
         linger.ms: 0
+        # Namastack attend l'envoi de façon synchrone : bornes courtes pour libérer vite le thread si Kafka est
+        # indisponible (l'enregistrement reste dans l'outbox et est retenté selon namastack.outbox.retry).
+        #   max.block.ms       : attente des métadonnées du topic / de place dans le buffer
+        #   request.timeout.ms : attente de la réponse d'un broker pour une requête
+        #   delivery.timeout.ms: délai total d'un envoi, retries internes compris (>= linger.ms + request.timeout.ms)
+        max.block.ms: 10000
+        request.timeout.ms: 10000
+        delivery.timeout.ms: 30000
+        # Pas d'en-tête __TypeId__ : le contrat est le JSON (event-contract), pas une classe Java du producteur
+        spring.json.add.type.headers: false
     template:
-      # Span "send" + injection de traceparent dans les en-têtes Kafka
+      # Span "send" + injection de traceparent / baggage dans les en-têtes Kafka
       observation-enabled: true
 
 namastack:
   outbox:
-    # Délai fixe entre la fin d'un poll et le suivant (remplace poll-interval / batch-size, dépréciés en 1.9)
+    jdbc:
+      # Tables créées par Flyway (V2__namastack_outbox.sql), jamais par l'application
+      schema-initialization:
+        enabled: false
     polling:
+      # Délai fixe entre la fin d'un poll et le suivant ; batch-size = nombre de clés (commandes) par poll
       trigger: fixed
       fixed:
         interval: 100ms
       batch-size: 100
     processing:
-      # Nombre de clés (commandes) traitées en parallèle dans un lot
+      # Clés traitées en parallèle dans un lot (chacune utilise ponctuellement une connexion du pool)
       executor-concurrency-limit: 16
-    jdbc:
-      # Namastack crée ses tables (outbox_record, outbox_instance, outbox_partition) au démarrage
-      schema-initialization:
-        enabled: true
-    kafka:
-      enabled: true
-      default-topic: orders.events
+      # true : un enregistrement envoyé est supprimé, la table ne grossit pas (production).
+      # false en local pour garder le lien base → trace (colonne context : traceparent + baggage).
+      delete-completed-records: ${OUTBOX_DELETE_COMPLETED:true}
+      # (défaut) un échec bloque les événements suivants de la même commande : l'ordre par commande est préservé
+      stop-on-first-failure: true
+    retry:
+      # Kafka indisponible : 2 s, 4 s, 8 s... plafonné à 1 min, soit ~6 min de tentatives avant FAILED
+      # (un enregistrement FAILED n'est plus retenté automatiquement : alerter sur outbox_records{outbox_record_status="failed"} > 0)
+      policy: exponential
+      max-retries: 10
+      exponential:
+        initial-delay: 2s
+        multiplier: 2.0
+        max-delay: 1m
+    instance:
+      # Multi-instances : les clés sont réparties sur 256 partitions logiques, attribuées aux instances actives.
+      # Chaque instance signale sa présence (heartbeat) ; sans heartbeat depuis stale-instance-timeout, elle est
+      # considérée morte et ses partitions sont reprises au rebalance suivant. Pire cas de reprise après un crash :
+      # stale-instance-timeout + rebalance-interval (~40 s). Un arrêt propre désinscrit l'instance tout de suite :
+      # ses partitions sont reprises au rebalance suivant des autres instances (<= rebalance-interval).
+      heartbeat-interval: 5s
+      stale-instance-timeout: 30s
+      rebalance-interval: 10s
 
 management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus,metrics
   # Corrélation métier : "order.id" voyage avec la trace (en-tête W3C baggage en HTTP / Kafka, contexte outbox),
-  # est ajouté en tag sur chaque span (recherche Jaeger order.id=...) et dans le MDC des logs.
+  # est ajouté en attribut de span (recherche Jaeger order.id=...) et dans le MDC des logs.
   tracing:
-    sampling:
-      probability: 1.0
     baggage:
       remote-fields: order.id
       tag-fields: order.id
       correlation:
         fields: order.id
-  opentelemetry:
-    tracing:
-      export:
-        otlp:
-          endpoint: http://localhost:4318/v1/traces
-  otlp:
-    metrics:
-      export:
-        # Métriques exposées uniquement via le scrape Prometheus
-        enabled: false
   metrics:
     distribution:
+      # Histogrammes (quantiles côté Prometheus) des métriques propres au service
       percentiles-histogram:
-        http.server.requests: true
         outbox.record.process: true
         outbox.record.schedule: true
         spring.kafka.template: true
 
 logging:
   pattern:
-    # ajoute order.id (baggage) aux logs, à côté de traceId/spanId
+    # Logs texte : order.id (MDC) à côté de traceId/spanId. En JSON (LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs),
+    # tous les champs MDC sont inclus automatiquement.
     correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},order.id=%X{order.id:-}] "
 
-# Requêtes SQL en spans (datasource-micrometer, conventions sémantiques OTel : db.query.text anonymisé,
-# db.query.summary). Pas de valeurs de paramètres (données personnelles) : include-parameter-values=false.
-jdbc:
-  includes: connection, query
-  datasource-proxy:
-    include-parameter-values: false
+order:
+  load-test:
+    # POST /orders/_bulk : absent par défaut, jamais activé en production
+    enabled: ${LOAD_TEST_ENABLED:false}
+    max-count: 100000
+    parallelism: 8

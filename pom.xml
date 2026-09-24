@@ -20,6 +20,7 @@
 
     <modules>
         <module>event-contract</module>
+        <module>observability-starter</module>
         <module>gateway</module>
         <module>order-service</module>
         <module>order-projector</module>
@@ -53,6 +54,16 @@
                 <groupId>net.ttddyy.observation</groupId>
                 <artifactId>datasource-micrometer-spring-boot</artifactId>
                 <version>${datasource-micrometer.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>poc.exploit</groupId>
+                <artifactId>observability-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>1.5.0</version>
             </dependency>
             <dependency>
                 <groupId>poc.exploit</groupId>
