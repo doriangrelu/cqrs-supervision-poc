@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: poc
+    folder: POC CQRS
+    type: file
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

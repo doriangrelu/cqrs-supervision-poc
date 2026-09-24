@@ -1,0 +1,48 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch: {}
+
+connectors:
+  # Métriques RED (rate / errors / duration) dérivées des spans, par service et opération.
+  span_metrics:
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2s, 5s, 10s]
+    dimensions:
+      - name: messaging.destination.name
+    exemplars:
+      enabled: true
+
+exporters:
+  otlp_grpc/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    enable_open_metrics: true
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlp_grpc/jaeger, span_metrics]
+    metrics/span_metrics:
+      receivers: [span_metrics]
+      exporters: [prometheus]
+    # Les applis exposent leurs métriques en scrape Prometheus ; ce pipeline accepte quand même
+    # l'OTLP metrics pour éviter les erreurs si un exporteur est actif.
+    metrics/otlp:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [debug]

@@ -1,0 +1,80 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: order-projector
+  datasource:
+    url: jdbc:postgresql://localhost:5432/orders_read
+    username: poc
+    password: poc
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: order-projector
+      auto-offset-reset: earliest
+      # clé et valeur en String ; la valeur JSON est convertie en OrderEvent par le listener (cf. KafkaConfig)
+    listener:
+      # 1 par défaut pour pouvoir provoquer du lag
+      concurrency: 1
+      ack-mode: record
+      observation-enabled: true
+    template:
+      observation-enabled: true
+
+projector:
+  sleep:
+    min: 50ms
+    max: 1500ms
+  failure-rate: 0.0
+  retry:
+    # nombre total de tentatives avant DLT
+    attempts: 3
+    interval: 500ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  # Corrélation métier : "order.id" voyage avec la trace (en-tête W3C baggage en HTTP / Kafka, contexte outbox),
+  # est ajouté en tag sur chaque span (recherche Jaeger order.id=...) et dans le MDC des logs.
+  tracing:
+    sampling:
+      probability: 1.0
+    baggage:
+      remote-fields: order.id
+      tag-fields: order.id
+      correlation:
+        fields: order.id
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/traces
+  otlp:
+    metrics:
+      export:
+        # métriques scrapées par Prometheus, pas poussées en OTLP
+        enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  level:
+    org.apache.kafka: WARN
+  pattern:
+    # ajoute order.id (baggage) aux logs, à côté de traceId/spanId
+    correlation: "[${spring.application.name:},%X{traceId:-},%X{spanId:-},order.id=%X{order.id:-}] "
+
+# Requêtes SQL en spans (datasource-micrometer, conventions sémantiques OTel : db.query.text anonymisé,
+# db.query.summary). Pas de valeurs de paramètres (données personnelles) : include-parameter-values=false.
+jdbc:
+  includes: connection, query
+  datasource-proxy:
+    include-parameter-values: false
