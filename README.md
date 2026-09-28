@@ -16,6 +16,8 @@ client ──► gateway ──► order-service ──(outbox, même transactio
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | principes, modules, parcours d'une écriture, organisation du code, gestion des erreurs |
 | [docs/observability.md](docs/observability.md) | lag de cohérence, traces, corrélation, métriques, logs, **runbook des alertes**, reconstruction d'une projection |
+| [docs/observability-explained.md](docs/observability-explained.md) | explication pédagogique, brique par brique : qui fait quoi et pourquoi (dont OTLP traces vs métriques vs logs) |
+| [docs/observability-playbook.md](docs/observability-playbook.md) | cadre réutilisable pour démarrer l'observabilité d'un **futur projet**, indépendant de cette stack |
 | [docs/configuration.md](docs/configuration.md) | variables d'environnement de chaque application |
 | [docs/guide-nouveau-service.md](docs/guide-nouveau-service.md) | **décliner cette base** dans un nouveau service |
 | [docs/production-checklist.md](docs/production-checklist.md) | ce qui est prêt pour la production, ce qui reste à faire selon le contexte |
