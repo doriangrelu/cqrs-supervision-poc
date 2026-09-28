@@ -16,7 +16,10 @@ logs/
 *.iml
 *.ipr
 *.iws
-out/
+# Ancré (racine du repo ou racine d'un module) : un `out/` non ancré matcherait aussi tout package
+# hexagonal `.../port/out/` ou `.../adapter/out/` (piège vécu : ces packages disparaissaient de git).
+/out/
+*/out/
 
 # Eclipse / STS
 .classpath
@@ -24,7 +27,8 @@ out/
 .settings/
 .factorypath
 .apt_generated/
-bin/
+/bin/
+*/bin/
 
 # VS Code
 .vscode/
